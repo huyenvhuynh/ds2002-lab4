@@ -1,0 +1,42 @@
+import argparse
+import boto3
+import requests
+import os
+
+def download_file(url, local_filename):
+    response = requests.get(url, stream=True)
+    with open(local_filename, 'wb') as file:
+        for chunk in response.iter_content(1024):
+            file.write(chunk)
+
+def upload_to_s3(local_filename, bucket_name, object_name):
+    s3 = boto3.client('s3')
+    s3.upload_file(local_filename, bucket_name, object_name)
+    
+def generate_presigned_url(bucket_name, object_name, expires_in):
+    s3 = boto3.client('s3')
+    url = s3.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': bucket_name, 'Key': object_name},
+        ExpiresIn=expires_in
+    )
+    return url
+
+def main():
+    parser = argparse.ArgumentParser(description="Download, upload, and generate S3 presigned URLs.")
+    parser.add_argument("url", help="URL of the file to download")
+    parser.add_argument("bucket", help="S3 bucket name")
+    parser.add_argument("expires", type=int, help="Presigned URL expiration time in seconds")
+    args = parser.parse_args()
+    
+    local_filename = os.path.basename(args.url)
+    
+    download_file(args.url, local_filename)
+    
+    upload_to_s3(local_filename, args.bucket, local_filename)
+    
+    presigned_url = generate_presigned_url(args.bucket, local_filename, args.expires)
+    print(f"Pre-signed URL (expires in {args.expires} seconds): {presigned_url}")
+
+if __name__ == "__main__":
+    main()
